@@ -73,7 +73,7 @@ body {
 
 .pane-content {
     flex: 1;
-    overflow-y: auto;
+    overflow: auto;
     padding: 0;
 }
 
@@ -100,7 +100,6 @@ body {
 
 .line-text {
     flex: 1;
-    overflow-x: auto;
 }
 
 .line.highlighted {
@@ -212,6 +211,7 @@ body {
 /* Scrollbar styling */
 .pane-content::-webkit-scrollbar {
     width: 8px;
+    height: 8px;
 }
 
 .pane-content::-webkit-scrollbar-track {
