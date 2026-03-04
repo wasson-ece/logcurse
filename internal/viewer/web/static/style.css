@@ -37,7 +37,10 @@ body {
 #version {
     color: #585b70;
     font-size: 11px;
-    margin-left: auto;
+    text-decoration: none;
+}
+#version:hover {
+    color: #89b4fa;
 }
 
 #container {
