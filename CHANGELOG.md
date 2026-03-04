@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-04
+
+### Added
+- Directory serving mode: `logcurse --serve ./logs/` serves a browsable file listing with annotation status, comment counts, and file sizes
+- Click any file in the directory listing to open it in the web viewer
+- "Back to directory" navigation link when viewing a file in directory mode
+- Download button in the web viewer header to save the source file
+- `/api/files` endpoint returning JSON list of files with annotation metadata
+- `/api/download` endpoint for file downloads in both single-file and directory modes
+- Path traversal protection for all directory-mode endpoints
+
+### Changed
+- Web viewer shows relative filename instead of full absolute path when serving a directory
+- Updated docs site Docker section with two-column layout showing `docker run` and `docker-compose.yml` examples
+- Updated README, docs site, and llms.txt with directory serving usage and examples
+
 ## [0.1.0] - 2026-03-04
 
 ### Added

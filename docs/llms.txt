@@ -29,8 +29,9 @@ Extract and place the binary on your PATH:
 
     docker pull ghcr.io/wasson-ece/logcurse
     docker run -p 8080:8080 -v /path/to/logs:/data ghcr.io/wasson-ece/logcurse /data/server.log
+    docker run -p 8080:8080 -v /path/to/logs:/data ghcr.io/wasson-ece/logcurse /data/
 
-Runs the web viewer in a minimal scratch-based container. Mount your log directory to /data.
+Runs the web viewer in a minimal scratch-based container. Mount your log directory to /data. Pass a single file or the directory path to browse all files.
 
 ### Windows Installer
 
@@ -86,9 +87,12 @@ Keybindings:
 ### Web viewer
 
     logcurse --serve <file>
+    logcurse --serve <directory>
     logcurse --serve --port <port> <file>
 
 Serves an interactive web UI at http://localhost:8080 (default). The --port flag sets a custom port. The frontend loads lines in 200-line chunks on demand with 2-chunk buffering, so it handles large files.
+
+When given a directory, logcurse shows a file listing page with annotation status. Annotated files (those with .yml sidecars) are sorted to the top with comment counts displayed. Click any file to open it in the viewer. The directory listing is non-recursive (only top-level files are shown).
 
 ### Flags summary
 
@@ -96,6 +100,7 @@ Serves an interactive web UI at http://localhost:8080 (default). The --port flag
     logcurse -n '<start>,<end>p' <file>      # add comment on range
     logcurse -n <line> <file>                # add comment on single line
     logcurse --serve <file>                  # web viewer on :8080
+    logcurse --serve <directory>             # directory browser on :8080
     logcurse --serve --port <port> <file>    # web viewer on custom port
     logcurse --version                       # print version
 

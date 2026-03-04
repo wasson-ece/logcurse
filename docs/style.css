@@ -390,6 +390,23 @@ kbd {
   color: var(--text-bright);
 }
 
+/* ── Docker columns ── */
+.docker-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+.docker-col .code-block {
+  margin: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.docker-col .code-block pre {
+  flex: 1;
+}
+
 /* ── Code blocks ── */
 .code-block {
   margin: 16px 0;
@@ -509,4 +526,5 @@ kbd {
   .install-card { padding: 20px; }
   .nav-links { gap: 16px; }
   .nav-links a { font-size: 13px; }
+  .docker-columns { grid-template-columns: 1fr; }
 }

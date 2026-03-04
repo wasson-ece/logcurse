@@ -38,18 +38,30 @@ Opens a dual-pane TUI. The left pane shows the file with line numbers; the right
 ### View in the browser
 
 ```bash
+# serve a single file
 logcurse --serve server.log
+
+# serve an entire directory of log files
+logcurse --serve ./logs/
+
+# use a custom port
 logcurse --serve --port 9090 server.log
 ```
 
 Serves a web viewer at `http://localhost:8080` (default). Lines load on demand in chunks, so this works with large files.
+
+When given a directory, logcurse shows a file listing page with annotation status. Annotated files (those with `.yml` sidecars) are sorted to the top with comment counts. Click any file to open it in the viewer.
 
 ## Install
 
 ### Docker
 
 ```bash
+# serve a single file
 docker run -p 8080:8080 -v /path/to/logs:/data ghcr.io/wasson-ece/logcurse /data/server.log
+
+# serve a directory
+docker run -p 8080:8080 -v /path/to/logs:/data ghcr.io/wasson-ece/logcurse /data/
 ```
 
 ### Windows Installer

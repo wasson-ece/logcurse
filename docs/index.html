@@ -153,12 +153,36 @@ go build -v</code></pre>
 
         <div class="install-card">
           <h3>Docker</h3>
-          <p>Run the web viewer in a minimal container &mdash; no Go installation needed. Mount your log directory and pass the file path.</p>
-          <div class="code-block">
-            <div class="code-bar"><span>shell</span></div>
-            <pre><code>docker run -p 8080:8080 \
+          <p>Run the web viewer in a minimal container &mdash; no Go installation needed. Mount your log directory and pass a file or directory path.</p>
+          <div class="docker-columns">
+            <div class="docker-col">
+              <div class="code-block">
+                <div class="code-bar"><span>docker run</span></div>
+                <pre><code><span class="c-comment"># single file</span>
+docker run -p 8080:8080 \
   -v /path/to/logs:/data \
-  ghcr.io/wasson-ece/logcurse /data/server.log</code></pre>
+  ghcr.io/wasson-ece/logcurse /data/server.log
+
+<span class="c-comment"># browse a directory</span>
+docker run -p 8080:8080 \
+  -v /path/to/logs:/data \
+  ghcr.io/wasson-ece/logcurse /data/</code></pre>
+              </div>
+            </div>
+            <div class="docker-col">
+              <div class="code-block">
+                <div class="code-bar"><span>docker-compose.yml</span></div>
+                <pre><code><span class="c-key">services</span>:
+  <span class="c-key">logcurse</span>:
+    <span class="c-key">image</span>: <span class="c-str">ghcr.io/wasson-ece/logcurse</span>
+    <span class="c-key">ports</span>:
+      - <span class="c-str">"8080:8080"</span>
+    <span class="c-key">volumes</span>:
+      - <span class="c-str">./logs:/data</span>
+    <span class="c-key">restart</span>: <span class="c-str">unless-stopped</span>
+    <span class="c-key">command</span>: <span class="c-str">/data/</span></code></pre>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -211,15 +235,20 @@ logcurse -n 42 server.log</code></pre>
 
       <div class="usage-block">
         <h3 class="subheading">Web Viewer</h3>
-        <p>Serve an interactive browser UI with the <code>--serve</code> flag. Defaults to port 8080.</p>
+        <p>Serve an interactive browser UI with the <code>--serve</code> flag. Defaults to port 8080. Pass a single file or a directory.</p>
         <div class="code-block">
           <div class="code-bar"><span>shell</span></div>
-          <pre><code>logcurse --serve server.log
+          <pre><code><span class="c-comment"># serve a single file</span>
+logcurse --serve server.log
+
+<span class="c-comment"># serve a directory of log files</span>
+logcurse --serve ./logs/
 
 <span class="c-comment"># use a custom port</span>
 logcurse --serve --port 9090 server.log</code></pre>
         </div>
         <p>The web viewer fetches 200-line chunks on demand with 2-chunk buffering, so it handles large files efficiently.</p>
+        <p>In directory mode, logcurse shows a file listing with annotation status. Annotated files are sorted to the top with comment counts. Click any file to open it in the viewer.</p>
       </div>
 
     </div>

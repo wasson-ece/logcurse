@@ -24,7 +24,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  logcurse <file>                  View file with comments in TUI\n")
 		fmt.Fprintf(os.Stderr, "  logcurse -n '1,10p' <file>       Add a comment on lines 1-10\n")
 		fmt.Fprintf(os.Stderr, "  logcurse -n 42 <file>            Add a comment on line 42\n")
-		fmt.Fprintf(os.Stderr, "  logcurse --serve <file>           Serve a web viewer\n\n")
+		fmt.Fprintf(os.Stderr, "  logcurse --serve <file|dir>       Serve a web viewer\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
 	}
@@ -41,24 +41,40 @@ func main() {
 	}
 	sourceFile := flag.Arg(0)
 
-	// Verify file exists
-	if _, err := os.Stat(sourceFile); os.IsNotExist(err) {
-		fmt.Fprintf(os.Stderr, "Error: file %q not found\n", sourceFile)
+	// Verify path exists
+	info, err := os.Stat(sourceFile)
+	if os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "Error: %q not found\n", sourceFile)
 		os.Exit(1)
 	}
 
 	switch {
 	case *rangeFlag != "":
+		if info.IsDir() {
+			fmt.Fprintf(os.Stderr, "Error: cannot use -n with a directory\n")
+			os.Exit(1)
+		}
 		if err := editor.AddComment(sourceFile, *rangeFlag); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
 	case *serveFlag:
-		if err := runWebServer(sourceFile, *portFlag); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+		if info.IsDir() {
+			if err := web.ServeDirectory(sourceFile, *portFlag, version); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			if err := runWebServer(sourceFile, *portFlag); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
 		}
 	default:
+		if info.IsDir() {
+			fmt.Fprintf(os.Stderr, "Error: cannot use TUI viewer with a directory; use --serve instead\n")
+			os.Exit(1)
+		}
 		if err := runTUI(sourceFile); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
