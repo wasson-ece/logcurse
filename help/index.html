@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>logcurse — annotate your logs</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;600;700;900&family=Nunito+Sans:ital,wght@0,400;0,600;1,400&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="grain"></div>
+
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <a href="#top" class="nav-logo">logcurse</a>
+    <div class="nav-links">
+      <a href="#about">About</a>
+      <a href="#install">Install</a>
+      <a href="#usage">Usage</a>
+      <a href="#format">Format</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero-terminal">
+    <div class="terminal-bar">
+      <span class="terminal-dot red"></span>
+      <span class="terminal-dot yellow"></span>
+      <span class="terminal-dot green"></span>
+      <span class="terminal-title">logcurse</span>
+    </div>
+    <div class="terminal-body">
+      <h1 class="hero-title">logcurse</h1>
+      <p class="hero-tagline">Annotate your log files.<br>Never touch the source.</p>
+      <div class="hero-prompt">
+        <span class="prompt-symbol">$</span>
+        <span class="prompt-text" id="typed"></span><span class="cursor">_</span>
+      </div>
+    </div>
+  </div>
+  <div class="hero-features">
+    <div class="feature-pill">YAML sidecar comments</div>
+    <div class="feature-pill">SHA-256 drift detection</div>
+    <div class="feature-pill">TUI &amp; web viewer</div>
+    <div class="feature-pill">large file support</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ABOUT -->
+  <section class="section" id="about">
+    <div class="section-inner">
+      <h2 class="section-heading"><span class="heading-accent">#</span> About</h2>
+      <div class="about-grid">
+        <div class="about-text">
+          <p><strong>logcurse</strong> is a command-line tool for annotating log files and text files with line-range comments. Comments are stored in YAML sidecar files alongside the original &mdash; your source file is never modified.</p>
+          <p>Comments include a SHA-256 hash of the referenced lines, so logcurse detects when the source file changes and flags comments as <em>drifted</em> without silently altering the YAML.</p>
+          <p>Written in Go. Open source.</p>
+          <a href="https://github.com/wasson-ece/logcurse" class="link-arrow" target="_blank" rel="noopener">View on GitHub &rarr;</a>
+        </div>
+        <div class="about-modes">
+          <h3 class="subheading">Three modes</h3>
+          <div class="mode-card">
+            <div class="mode-icon">edit</div>
+            <div>
+              <strong>Comment Editor</strong>
+              <p>Open <code>$EDITOR</code> to add comments to specific line ranges.</p>
+            </div>
+          </div>
+          <div class="mode-card">
+            <div class="mode-icon">view</div>
+            <div>
+              <strong>TUI Viewer</strong>
+              <p>Dual-pane terminal UI with file and comment panes side-by-side.</p>
+            </div>
+          </div>
+          <div class="mode-card">
+            <div class="mode-icon">web</div>
+            <div>
+              <strong>Web Viewer</strong>
+              <p>Interactive browser UI with chunked loading for large files.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section class="section section-alt" id="install">
+    <div class="section-inner">
+      <h2 class="section-heading"><span class="heading-accent">#</span> Installation</h2>
+
+      <div class="install-methods">
+
+        <div class="install-card">
+          <div class="install-badge">recommended</div>
+          <h3>Binary Release</h3>
+          <p>Download a prebuilt binary from GitHub Releases. Pick the right archive for your OS and architecture, extract, and add to your <code>PATH</code>.</p>
+          <div class="code-block">
+            <div class="code-bar"><span>shell</span></div>
+            <pre><code><span class="c-comment"># download &amp; extract (example: macOS arm64)</span>
+curl -LO https://github.com/wasson-ece/logcurse/releases/latest/download/logcurse_darwin_arm64.tar.gz
+tar xzf logcurse_darwin_arm64.tar.gz
+sudo mv logcurse /usr/local/bin/</code></pre>
+          </div>
+          <table class="platform-table">
+            <thead><tr><th>OS</th><th>Arch</th><th>Archive</th></tr></thead>
+            <tbody>
+              <tr><td>macOS</td><td>arm64</td><td><code>logcurse_darwin_arm64.tar.gz</code></td></tr>
+              <tr><td>macOS</td><td>amd64</td><td><code>logcurse_darwin_amd64.tar.gz</code></td></tr>
+              <tr><td>Linux</td><td>arm64</td><td><code>logcurse_linux_arm64.tar.gz</code></td></tr>
+              <tr><td>Linux</td><td>amd64</td><td><code>logcurse_linux_amd64.tar.gz</code></td></tr>
+              <tr><td>Windows</td><td>amd64</td><td><code>logcurse_windows_amd64.zip</code></td></tr>
+            </tbody>
+          </table>
+          <a href="https://github.com/wasson-ece/logcurse/releases" class="link-arrow" target="_blank" rel="noopener">Browse all releases &rarr;</a>
+        </div>
+
+        <div class="install-card">
+          <h3>Windows Installer</h3>
+          <p>Download and run the setup executable. It installs logcurse to Program Files, adds it to your PATH, and registers an uninstaller in Add/Remove Programs.</p>
+          <div class="code-block">
+            <div class="code-bar"><span>download</span></div>
+            <pre><code>logcurse-setup-amd64.exe</code></pre>
+          </div>
+          <a href="https://github.com/wasson-ece/logcurse/releases" class="link-arrow" target="_blank" rel="noopener">Download from Releases &rarr;</a>
+        </div>
+
+        <div class="install-card">
+          <h3>Go Install</h3>
+          <p>If you have Go 1.24+ installed:</p>
+          <div class="code-block">
+            <div class="code-bar"><span>shell</span></div>
+            <pre><code>go install github.com/wasson-ece/logcurse@latest</code></pre>
+          </div>
+        </div>
+
+        <div class="install-card">
+          <h3>Build from Source</h3>
+          <div class="code-block">
+            <div class="code-bar"><span>shell</span></div>
+            <pre><code>git clone https://github.com/wasson-ece/logcurse.git
+cd logcurse
+go build -v</code></pre>
+          </div>
+        </div>
+
+        <div class="install-card">
+          <h3>Docker</h3>
+          <p>Run the web viewer in a minimal container &mdash; no Go installation needed. Mount your log directory and pass the file path.</p>
+          <div class="code-block">
+            <div class="code-bar"><span>shell</span></div>
+            <pre><code>docker run -p 8080:8080 \
+  -v /path/to/logs:/data \
+  ghcr.io/wasson-ece/logcurse /data/server.log</code></pre>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- USAGE -->
+  <section class="section" id="usage">
+    <div class="section-inner">
+      <h2 class="section-heading"><span class="heading-accent">#</span> Usage</h2>
+
+      <div class="usage-block">
+        <h3 class="subheading">Adding Comments</h3>
+        <p>Use the <code>-n</code> flag with a sed-style range to open your editor and write a comment on specific lines. Lines are 1-indexed and inclusive. A bare number targets a single line.</p>
+        <div class="code-block">
+          <div class="code-bar"><span>shell</span></div>
+          <pre><code><span class="c-comment"># comment on lines 140-160 of server.log</span>
+logcurse -n '140,160p' server.log
+
+<span class="c-comment"># comment on a single line</span>
+logcurse -n 42 server.log</code></pre>
+        </div>
+        <p>This opens <code>$VISUAL</code> or <code>$EDITOR</code> (falling back to <code>nano</code> on macOS/Linux, <code>notepad</code> on Windows). The comment is saved to <code>server.log.yml</code>.</p>
+      </div>
+
+      <div class="usage-block">
+        <h3 class="subheading">TUI Viewer <span class="tag">default</span></h3>
+        <p>Run logcurse with just a filename to open the dual-pane terminal viewer.</p>
+        <div class="code-block">
+          <div class="code-bar"><span>shell</span></div>
+          <pre><code>logcurse server.log</code></pre>
+        </div>
+
+        <table class="keybind-table">
+          <thead><tr><th>Key</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>Tab</kbd></td><td>Switch focus between file and comment panes</td></tr>
+            <tr><td><kbd>n</kbd> / <kbd>p</kbd></td><td>Jump to next / previous comment</td></tr>
+            <tr><td><kbd>&uarr;</kbd><kbd>k</kbd> &ensp; <kbd>&darr;</kbd><kbd>j</kbd></td><td>Scroll up / down</td></tr>
+            <tr><td><kbd>PgUp</kbd> / <kbd>PgDn</kbd></td><td>Page scroll</td></tr>
+            <tr><td><kbd>Ctrl+U</kbd> / <kbd>Ctrl+D</kbd></td><td>Half-page scroll</td></tr>
+            <tr><td><kbd>Home</kbd><kbd>g</kbd> &ensp; <kbd>End</kbd><kbd>G</kbd></td><td>Jump to top / bottom</td></tr>
+            <tr><td><kbd>s</kbd></td><td>Toggle vertical / horizontal split</td></tr>
+            <tr><td><kbd>?</kbd></td><td>Toggle help bar</td></tr>
+            <tr><td><kbd>q</kbd> / <kbd>Ctrl+C</kbd></td><td>Quit</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="usage-block">
+        <h3 class="subheading">Web Viewer</h3>
+        <p>Serve an interactive browser UI with the <code>--serve</code> flag. Defaults to port 8080.</p>
+        <div class="code-block">
+          <div class="code-bar"><span>shell</span></div>
+          <pre><code>logcurse --serve server.log
+
+<span class="c-comment"># use a custom port</span>
+logcurse --serve --port 9090 server.log</code></pre>
+        </div>
+        <p>The web viewer fetches 200-line chunks on demand with 2-chunk buffering, so it handles large files efficiently.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- FORMAT -->
+  <section class="section section-alt" id="format">
+    <div class="section-inner">
+      <h2 class="section-heading"><span class="heading-accent">#</span> Comment Format</h2>
+      <p>Comments live in a YAML sidecar file next to the source: <code>server.log</code> &rarr; <code>server.log.yml</code>. The source file is never touched.</p>
+      <div class="code-block code-block-wide">
+        <div class="code-bar"><span>server.log.yml</span></div>
+        <pre><code><span class="c-key">version</span>: <span class="c-val">1</span>
+<span class="c-key">source_file</span>: <span class="c-str">server.log</span>
+<span class="c-key">comments</span>:
+  - <span class="c-key">id</span>: <span class="c-str">"c1"</span>
+    <span class="c-key">range</span>:
+      <span class="c-key">start</span>: <span class="c-val">140</span>
+      <span class="c-key">end</span>: <span class="c-val">160</span>
+    <span class="c-key">content_hash</span>: <span class="c-str">"sha256:a3f2b8..."</span>
+    <span class="c-key">author</span>: <span class="c-str">""</span>
+    <span class="c-key">created</span>: <span class="c-str">"2026-03-04T10:30:00Z"</span>
+    <span class="c-key">updated</span>: <span class="c-str">"2026-03-04T10:30:00Z"</span>
+    <span class="c-key">body</span>: <span class="c-comment">|</span>
+      <span class="c-str">This block shows the auth timeout</span>
+      <span class="c-str">that caused the cascade failure.</span></code></pre>
+      </div>
+      <div class="format-notes">
+        <div class="format-note">
+          <strong>IDs</strong> are sequential: <code>c1</code>, <code>c2</code>, <code>c3</code>&hellip;
+        </div>
+        <div class="format-note">
+          <strong>Ranges</strong> are 1-indexed and inclusive.
+        </div>
+        <div class="format-note">
+          <strong>content_hash</strong> is a SHA-256 of the referenced lines at comment time. If the source changes, the comment is flagged as <em>drifted</em>.
+        </div>
+        <div class="format-note">
+          <strong>Timestamps</strong> use RFC 3339 format.
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="section-inner">
+    <p class="footer-text"><span class="footer-logo">logcurse</span> &mdash; open source under MIT &mdash; <a href="https://github.com/wasson-ece/logcurse" target="_blank" rel="noopener">github.com/wasson-ece/logcurse</a></p>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+# logcurse
+
+> Annotate log files with line-range comments stored in YAML sidecar files. The source file is never modified.
+
+Project: https://github.com/wasson-ece/logcurse
+Language: Go (1.24+)
+License: MIT
+
+## Installation
+
+### Binary releases (recommended)
+
+Download from GitHub Releases: https://github.com/wasson-ece/logcurse/releases
+
+Available archives:
+- logcurse_darwin_arm64.tar.gz (macOS Apple Silicon)
+- logcurse_darwin_amd64.tar.gz (macOS Intel)
+- logcurse_linux_arm64.tar.gz (Linux ARM)
+- logcurse_linux_amd64.tar.gz (Linux x86_64)
+- logcurse_windows_amd64.zip (Windows x86_64)
+
+Extract and place the binary on your PATH:
+
+    curl -LO https://github.com/wasson-ece/logcurse/releases/latest/download/logcurse_darwin_arm64.tar.gz
+    tar xzf logcurse_darwin_arm64.tar.gz
+    sudo mv logcurse /usr/local/bin/
+
+### Docker
+
+    docker pull ghcr.io/wasson-ece/logcurse
+    docker run -p 8080:8080 -v /path/to/logs:/data ghcr.io/wasson-ece/logcurse /data/server.log
+
+Runs the web viewer in a minimal scratch-based container. Mount your log directory to /data.
+
+### Windows Installer
+
+Download logcurse-setup-amd64.exe from GitHub Releases: https://github.com/wasson-ece/logcurse/releases
+
+The installer adds logcurse to Program Files, sets up the user PATH, and registers an uninstaller in Add/Remove Programs. 64-bit Windows only.
+
+### Go install
+
+    go install github.com/wasson-ece/logcurse@latest
+
+### Build from source
+
+    git clone https://github.com/wasson-ece/logcurse.git
+    cd logcurse
+    go build -v
+
+## Usage
+
+logcurse has three modes: comment editor, TUI viewer, and web viewer.
+
+### Adding a comment
+
+    logcurse -n '<start>,<end>p' <file>
+    logcurse -n <line> <file>
+
+The -n flag takes a sed-style line range or a single line number. Lines are 1-indexed and inclusive. This opens $VISUAL or $EDITOR ($EDITOR fallback, then nano on macOS/Linux, notepad on Windows) with the referenced lines shown as context. Write a comment, save, and close. The comment is stored in <file>.yml.
+
+Examples:
+
+    logcurse -n '140,160p' server.log
+    logcurse -n 42 server.log
+
+This creates or appends to server.log.yml.
+
+### TUI viewer (default mode)
+
+    logcurse <file>
+
+Opens a dual-pane terminal UI. The left pane shows the file with line numbers; the right pane shows comments aligned to their line ranges.
+
+Keybindings:
+- Tab         — switch focus between file and comment panes
+- n / p       — jump to next / previous comment
+- Up/k Down/j — scroll
+- PgUp / PgDn — page scroll
+- Ctrl+U / Ctrl+D — half-page scroll
+- Home/g End/G — jump to top / bottom
+- s           — toggle vertical / horizontal split
+- ?           — toggle help bar
+- q / Ctrl+C  — quit
+
+### Web viewer
+
+    logcurse --serve <file>
+    logcurse --serve --port <port> <file>
+
+Serves an interactive web UI at http://localhost:8080 (default). The --port flag sets a custom port. The frontend loads lines in 200-line chunks on demand with 2-chunk buffering, so it handles large files.
+
+### Flags summary
+
+    logcurse <file>                          # TUI viewer (default)
+    logcurse -n '<start>,<end>p' <file>      # add comment on range
+    logcurse -n <line> <file>                # add comment on single line
+    logcurse --serve <file>                  # web viewer on :8080
+    logcurse --serve --port <port> <file>    # web viewer on custom port
+    logcurse --version                       # print version
+
+## Comment format
+
+Comments are stored in a YAML sidecar file at <file>.yml (e.g. server.log -> server.log.yml). The source file is never modified.
+
+    version: 1
+    source_file: server.log
+    comments:
+      - id: "c1"
+        range:
+          start: 140
+          end: 160
+        content_hash: "sha256:a3f2b8..."
+        author: ""
+        created: "2026-03-04T10:30:00Z"
+        updated: "2026-03-04T10:30:00Z"
+        body: |
+          Connection timeout during deploy.
+          Root cause was the DB migration running long.
+
+Fields:
+- id: sequential string (c1, c2, c3, ...)
+- range.start / range.end: 1-indexed, inclusive line numbers
+- content_hash: SHA-256 of the referenced lines at comment creation time
+- author: string (currently empty, reserved for future use)
+- created / updated: RFC 3339 timestamps
+- body: free-text comment content
+
+### Drift detection
+
+Each comment stores a SHA-256 hash of the source lines it references. When viewing, logcurse recomputes the hash and flags comments as "drifted" if the source has changed. The YAML file is never silently modified — drift is a transient display-only flag.
