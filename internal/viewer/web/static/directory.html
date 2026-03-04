@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>logcurse - directory</title>
+    <link rel="stylesheet" href="/view/style.css">
+    <style>
+        #container {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+            display: block;
+        }
+        .file-list {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        .file-entry {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            border: 1px solid #313244;
+            margin-bottom: 6px;
+            text-decoration: none;
+            color: #cdd6f4;
+            transition: background 0.15s;
+        }
+        .file-entry:hover {
+            background: #313244;
+        }
+        .file-entry.dimmed {
+            opacity: 0.5;
+        }
+        .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .file-size {
+            color: #6c7086;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+        .badge {
+            background: #cba6f7;
+            color: #1e1e2e;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 10px;
+            white-space: nowrap;
+        }
+        .loading { padding: 24px; text-align: center; color: #6c7086; }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>logcurse</h1>
+        <span id="file-info">directory listing</span>
+        <span id="version"></span>
+    </div>
+    <div id="container">
+        <div class="file-list" id="file-list">
+            <div class="loading">Loading...</div>
+        </div>
+    </div>
+    <script>
+    (function() {
+        "use strict";
+
+        function formatSize(bytes) {
+            if (bytes < 1024) return bytes + " B";
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+            return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+        }
+
+        async function init() {
+            const list = document.getElementById("file-list");
+            try {
+                const resp = await fetch("/api/files");
+                const files = await resp.json();
+
+                // Sort: annotated first, then alphabetical
+                files.sort(function(a, b) {
+                    if (a.annotated !== b.annotated) return a.annotated ? -1 : 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+                list.innerHTML = "";
+
+                if (files.length === 0) {
+                    list.innerHTML = '<div class="loading">No files found.</div>';
+                    return;
+                }
+
+                for (var i = 0; i < files.length; i++) {
+                    var f = files[i];
+                    var a = document.createElement("a");
+                    a.className = "file-entry" + (f.annotated ? "" : " dimmed");
+                    a.href = "/view/index.html?file=" + encodeURIComponent(f.name);
+
+                    var name = document.createElement("span");
+                    name.className = "file-name";
+                    name.textContent = f.name;
+                    a.appendChild(name);
+
+                    if (f.annotated) {
+                        var badge = document.createElement("span");
+                        badge.className = "badge";
+                        badge.textContent = f.comment_count + " comment" + (f.comment_count !== 1 ? "s" : "");
+                        a.appendChild(badge);
+                    }
+
+                    var size = document.createElement("span");
+                    size.className = "file-size";
+                    size.textContent = formatSize(f.size);
+                    a.appendChild(size);
+
+                    list.appendChild(a);
+                }
+
+                fetch("/api/version").then(function(r) { return r.text(); }).then(function(v) {
+                    document.getElementById("version").textContent = v;
+                });
+            } catch (err) {
+                list.innerHTML = '<div class="loading">Error: ' + err.message + '</div>';
+            }
+        }
+
+        init();
+    })();
+    </script>
+</body>
+</html>

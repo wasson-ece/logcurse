@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/wasson-ece/logcurse/internal/fileutil"
@@ -157,4 +158,190 @@ func TestCommentsHandler(t *testing.T) {
 			t.Fatalf("expected body=%q, got %q", "test comment", resp.Comments[0].Body)
 		}
 	})
+}
+
+func TestResolveAndValidate(t *testing.T) {
+	dir := t.TempDir()
+
+	t.Run("normal filename", func(t *testing.T) {
+		// Create the file so the path is valid
+		os.WriteFile(filepath.Join(dir, "test.log"), []byte("hi"), 0644)
+		path, err := resolveAndValidate(dir, "test.log")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		expected := filepath.Join(dir, "test.log")
+		absExpected, _ := filepath.Abs(expected)
+		if path != absExpected {
+			t.Fatalf("expected %q, got %q", absExpected, path)
+		}
+	})
+
+	t.Run("empty filename", func(t *testing.T) {
+		_, err := resolveAndValidate(dir, "")
+		if err == nil {
+			t.Fatal("expected error for empty filename")
+		}
+	})
+
+	t.Run("path traversal with slash", func(t *testing.T) {
+		_, err := resolveAndValidate(dir, "../etc/passwd")
+		if err == nil {
+			t.Fatal("expected error for path traversal")
+		}
+	})
+
+	t.Run("path traversal with backslash", func(t *testing.T) {
+		_, err := resolveAndValidate(dir, "..\\etc\\passwd")
+		if err == nil {
+			t.Fatal("expected error for backslash path traversal")
+		}
+	})
+
+	t.Run("subdirectory attempt", func(t *testing.T) {
+		_, err := resolveAndValidate(dir, "sub/file.log")
+		if err == nil {
+			t.Fatal("expected error for subdirectory path")
+		}
+	})
+}
+
+func TestFilesHandler(t *testing.T) {
+	dir := t.TempDir()
+
+	// Create test files
+	os.WriteFile(filepath.Join(dir, "app.log"), []byte("line1\nline2\n"), 0644)
+	os.WriteFile(filepath.Join(dir, "error.log"), []byte("err\n"), 0644)
+
+	// Create an annotated file with sidecar
+	os.WriteFile(filepath.Join(dir, "server.log"), []byte("line1\nline2\nline3\n"), 0644)
+	serverPath := filepath.Join(dir, "server.log")
+	comment, _ := model.NewComment(serverPath, 1, 2, "test note")
+	comment.ID = "c1"
+	cf := &model.CommentFile{Version: 1, SourceFile: serverPath, Comments: []model.Comment{*comment}}
+	model.Save(filepath.Join(dir, "server.log.yml"), cf)
+
+	// Create a subdirectory (should be excluded)
+	os.Mkdir(filepath.Join(dir, "subdir"), 0755)
+
+	handler := filesHandler(dir)
+	req := httptest.NewRequest("GET", "/api/files", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var files []fileEntry
+	if err := json.NewDecoder(w.Body).Decode(&files); err != nil {
+		t.Fatal(err)
+	}
+
+	// Should have 3 files (app.log, error.log, server.log) -- yml excluded, subdir excluded
+	if len(files) != 3 {
+		t.Fatalf("expected 3 files, got %d: %+v", len(files), files)
+	}
+
+	// Find server.log and check annotation
+	sort.Slice(files, func(i, j int) bool { return files[i].Name < files[j].Name })
+
+	found := false
+	for _, f := range files {
+		if f.Name == "server.log" {
+			found = true
+			if !f.Annotated {
+				t.Fatal("expected server.log to be annotated")
+			}
+			if f.CommentCount != 1 {
+				t.Fatalf("expected 1 comment, got %d", f.CommentCount)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("server.log not in file list")
+	}
+}
+
+func TestDirLinesHandler(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "test.log"), []byte("alpha\nbeta\ngamma\n"), 0644)
+
+	cache := newIndexCache()
+	handler := dirLinesHandler(dir, cache)
+
+	req := httptest.NewRequest("GET", "/api/lines?file=test.log&start=1&end=2", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp linesResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if len(resp.Lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d", len(resp.Lines))
+	}
+	if resp.Lines[0].Text != "alpha" {
+		t.Fatalf("expected 'alpha', got %q", resp.Lines[0].Text)
+	}
+}
+
+func TestDirLinesHandler_PathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	cache := newIndexCache()
+	handler := dirLinesHandler(dir, cache)
+
+	tests := []struct {
+		name string
+		file string
+	}{
+		{"dot-dot slash", "../etc/passwd"},
+		{"backslash", "..\\secret"},
+		{"nested slash", "sub/file.log"},
+		{"empty", ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("GET", "/api/lines?file="+tc.file+"&start=1&end=1", nil)
+			w := httptest.NewRecorder()
+			handler(w, req)
+
+			if w.Code != http.StatusBadRequest {
+				t.Fatalf("expected 400 for file=%q, got %d", tc.file, w.Code)
+			}
+		})
+	}
+}
+
+func TestDirCommentsHandler(t *testing.T) {
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "test.log")
+	os.WriteFile(logPath, []byte("line1\nline2\nline3\n"), 0644)
+
+	// Create sidecar
+	comment, _ := model.NewComment(logPath, 1, 2, "dir comment")
+	comment.ID = "c1"
+	cf := &model.CommentFile{Version: 1, SourceFile: logPath, Comments: []model.Comment{*comment}}
+	model.Save(filepath.Join(dir, "test.log.yml"), cf)
+
+	handler := dirCommentsHandler(dir)
+	req := httptest.NewRequest("GET", "/api/comments?file=test.log", nil)
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp commentsResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if len(resp.Comments) != 1 {
+		t.Fatalf("expected 1 comment, got %d", len(resp.Comments))
+	}
+	if resp.Comments[0].Body != "dir comment" {
+		t.Fatalf("expected body=%q, got %q", "dir comment", resp.Comments[0].Body)
+	}
 }

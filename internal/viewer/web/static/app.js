@@ -4,6 +4,12 @@
     const CHUNK_SIZE = 200;
     const GAP_CHUNK = 250;
 
+    // Directory mode: read ?file= param from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileParam = urlParams.get("file");
+    const fileSuffix = fileParam ? "&file=" + encodeURIComponent(fileParam) : "";
+    const fileQuery = fileParam ? "?file=" + encodeURIComponent(fileParam) : "";
+
     let totalLines = 0;
     let loadedRanges = []; // [{start, end}]
     let comments = [];
@@ -14,12 +20,12 @@
     const fileInfo = document.getElementById("file-info");
 
     async function fetchLines(start, end) {
-        const resp = await fetch(`/api/lines?start=${start}&end=${end}`);
+        const resp = await fetch(`/api/lines?start=${start}&end=${end}${fileSuffix}`);
         return resp.json();
     }
 
     async function fetchComments() {
-        const resp = await fetch("/api/comments");
+        const resp = await fetch("/api/comments" + fileQuery);
         return resp.json();
     }
 
@@ -309,7 +315,8 @@
             ]);
 
             totalLines = linesData.total_lines;
-            fileInfo.textContent = `${commentsData.source_file} — ${totalLines} lines, ${commentsData.comments.length} comments`;
+            const displayName = fileParam || commentsData.source_file;
+            fileInfo.textContent = `${displayName} — ${totalLines} lines, ${commentsData.comments.length} comments`;
 
             fileContent.innerHTML = "";
             insertLines(linesData);
@@ -319,8 +326,29 @@
             renderComments();
             updateGapSeparators();
 
+            // In directory mode, add back link and download button before version
+            const header = document.getElementById("header");
+            const versionEl = document.getElementById("version");
+            if (fileParam) {
+                const backLink = document.createElement("a");
+                backLink.href = "/";
+                backLink.textContent = "\u2190 back to directory";
+                backLink.style.cssText = "color:#89b4fa;text-decoration:none;margin-left:auto;font-size:12px;";
+                backLink.addEventListener("mouseenter", function() { backLink.style.textDecoration = "underline"; });
+                backLink.addEventListener("mouseleave", function() { backLink.style.textDecoration = "none"; });
+                header.insertBefore(backLink, versionEl);
+            }
+
+            const dlLink = document.createElement("a");
+            dlLink.href = `/api/download${fileQuery}`;
+            dlLink.textContent = "\u2193 download";
+            dlLink.style.cssText = "color:#89b4fa;text-decoration:none;font-size:12px;" + (fileParam ? "" : "margin-left:auto;");
+            dlLink.addEventListener("mouseenter", function() { dlLink.style.textDecoration = "underline"; });
+            dlLink.addEventListener("mouseleave", function() { dlLink.style.textDecoration = "none"; });
+            header.insertBefore(dlLink, versionEl);
+
             fetch("/api/version").then(r => r.text()).then(v => {
-                document.getElementById("version").textContent = v;
+                versionEl.textContent = v;
             });
         } catch (err) {
             fileContent.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
