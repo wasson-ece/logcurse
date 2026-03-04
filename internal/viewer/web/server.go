@@ -27,6 +27,7 @@ func Serve(sourceFile string, port int, version string) error {
 	mux.HandleFunc("/api/lines", linesHandler(sourceFile, idx))
 	mux.HandleFunc("/api/comments", commentsHandler(sourceFile))
 	mux.HandleFunc("/api/download", downloadHandler(sourceFile))
+	mux.HandleFunc("/api/download-comments", downloadCommentsHandler(sourceFile))
 	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(version))
@@ -86,6 +87,7 @@ func ServeDirectory(dir string, port int, version string) error {
 	mux.HandleFunc("/api/lines", dirLinesHandler(absDir, cache))
 	mux.HandleFunc("/api/comments", dirCommentsHandler(absDir))
 	mux.HandleFunc("/api/download", dirDownloadHandler(absDir))
+	mux.HandleFunc("/api/download-comments", dirDownloadCommentsHandler(absDir))
 	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(version))

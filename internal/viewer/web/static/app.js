@@ -339,13 +339,18 @@
                 header.insertBefore(backLink, versionEl);
             }
 
-            const dlLink = document.createElement("a");
-            dlLink.href = `/api/download${fileQuery}`;
-            dlLink.textContent = "\u2193 download";
-            dlLink.style.cssText = "color:#89b4fa;text-decoration:none;font-size:12px;" + (fileParam ? "" : "margin-left:auto;");
-            dlLink.addEventListener("mouseenter", function() { dlLink.style.textDecoration = "underline"; });
-            dlLink.addEventListener("mouseleave", function() { dlLink.style.textDecoration = "none"; });
-            header.insertBefore(dlLink, versionEl);
+            // Set up pane-header download links
+            const fileDl = document.getElementById("file-download");
+            fileDl.href = `/api/download${fileQuery}`;
+            fileDl.textContent = "\u2193 download";
+            fileDl.style.display = "inline";
+
+            if (comments.length > 0) {
+                const commentsDl = document.getElementById("comments-download");
+                commentsDl.href = `/api/download-comments${fileQuery}`;
+                commentsDl.textContent = "\u2193 download";
+                commentsDl.style.display = "inline";
+            }
 
             fetch("/api/version").then(r => r.text()).then(v => {
                 versionEl.textContent = v;

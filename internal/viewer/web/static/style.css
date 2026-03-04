@@ -62,6 +62,9 @@ body {
 }
 
 .pane-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     padding: 6px 12px;
     background: #181825;
     border-bottom: 1px solid #313244;
@@ -69,6 +72,19 @@ body {
     text-transform: uppercase;
     color: #6c7086;
     letter-spacing: 0.5px;
+}
+
+.pane-header-link {
+    color: #89b4fa;
+    text-decoration: none;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: 0;
+    display: none;
+}
+
+.pane-header-link:hover {
+    text-decoration: underline;
 }
 
 .pane-content {

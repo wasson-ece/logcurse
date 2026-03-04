@@ -235,6 +235,19 @@ func downloadHandler(sourceFile string) http.HandlerFunc {
 	}
 }
 
+func downloadCommentsHandler(sourceFile string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ymlPath := model.SidecarPath(sourceFile)
+		if _, err := os.Stat(ymlPath); err != nil {
+			http.Error(w, "no comments file found", http.StatusNotFound)
+			return
+		}
+		name := filepath.Base(ymlPath)
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, name))
+		http.ServeFile(w, r, ymlPath)
+	}
+}
+
 func dirDownloadHandler(dir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		filename := r.URL.Query().Get("file")
@@ -246,5 +259,25 @@ func dirDownloadHandler(dir string) http.HandlerFunc {
 
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, filename))
 		http.ServeFile(w, r, fullPath)
+	}
+}
+
+func dirDownloadCommentsHandler(dir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		filename := r.URL.Query().Get("file")
+		fullPath, err := resolveAndValidate(dir, filename)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		ymlPath := model.SidecarPath(fullPath)
+		if _, err := os.Stat(ymlPath); err != nil {
+			http.Error(w, "no comments file found", http.StatusNotFound)
+			return
+		}
+		ymlName := filepath.Base(ymlPath)
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, ymlName))
+		http.ServeFile(w, r, ymlPath)
 	}
 }

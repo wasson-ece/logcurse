@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-04
+
+### Added
+
+- Added ability to download comment file
+
 ## [0.2.2] - 2026-03-04
 
 ### Added
