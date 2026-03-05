@@ -17,6 +17,7 @@ func main() {
 	rangeFlag := flag.String("n", "", "Add a comment on a line range (sed-style, e.g. '1,10p' or '42')")
 	serveFlag := flag.Bool("serve", false, "Serve a web viewer")
 	portFlag := flag.Int("port", 8080, "Port for web server (used with --serve)")
+	rwFlag := flag.Bool("rw", false, "Enable read-write mode in web viewer (used with --serve)")
 	versionFlag := flag.Bool("version", false, "Print version and exit")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: logcurse [flags] <file>\n\n")
@@ -24,7 +25,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  logcurse <file>                  View file with comments in TUI\n")
 		fmt.Fprintf(os.Stderr, "  logcurse -n '1,10p' <file>       Add a comment on lines 1-10\n")
 		fmt.Fprintf(os.Stderr, "  logcurse -n 42 <file>            Add a comment on line 42\n")
-		fmt.Fprintf(os.Stderr, "  logcurse --serve <file|dir>       Serve a web viewer\n\n")
+		fmt.Fprintf(os.Stderr, "  logcurse --serve <file|dir>       Serve a web viewer\n")
+		fmt.Fprintf(os.Stderr, "  logcurse --serve --rw <file|dir>  Serve with read-write comments\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
 	}
@@ -60,12 +62,12 @@ func main() {
 		}
 	case *serveFlag:
 		if info.IsDir() {
-			if err := web.ServeDirectory(sourceFile, *portFlag, version); err != nil {
+			if err := web.ServeDirectory(sourceFile, *portFlag, version, *rwFlag); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
 		} else {
-			if err := runWebServer(sourceFile, *portFlag); err != nil {
+			if err := web.Serve(sourceFile, *portFlag, version, *rwFlag); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				os.Exit(1)
 			}
@@ -86,6 +88,3 @@ func runTUI(sourceFile string) error {
 	return tui.Run(sourceFile)
 }
 
-func runWebServer(sourceFile string, port int) error {
-	return web.Serve(sourceFile, port, version)
-}

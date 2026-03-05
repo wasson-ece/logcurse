@@ -15,6 +15,7 @@
     let comments = [];
     let loading = false;
     let selectedRange = null; // {start, end}
+    let rwMode = false;
 
     const fileContent = document.getElementById("file-content");
     const commentContent = document.getElementById("comment-content");
@@ -28,6 +29,28 @@
     async function fetchComments() {
         const resp = await fetch("/api/comments" + fileQuery);
         return resp.json();
+    }
+
+    async function fetchConfig() {
+        const resp = await fetch("/api/config");
+        return resp.json();
+    }
+
+    function getAuthor() {
+        return localStorage.getItem("logcurse_author") || "";
+    }
+
+    function promptAuthor() {
+        let author = getAuthor();
+        if (!author) {
+            author = prompt("Enter your name (used for comment IDs):");
+            if (author) {
+                localStorage.setItem("logcurse_author", author.trim());
+                return author.trim();
+            }
+            return "";
+        }
+        return author;
     }
 
     function isRangeLoaded(start, end) {
@@ -54,6 +77,7 @@
             el.classList.remove("selected");
         });
         selectedRange = null;
+        hideAddCommentBar();
         history.replaceState(null, "", window.location.pathname + window.location.search);
     }
 
@@ -70,6 +94,10 @@
             ? `#L${selectedRange.start}`
             : `#L${selectedRange.start}-L${selectedRange.end}`;
         history.replaceState(null, "", hash);
+
+        if (rwMode) {
+            showAddCommentBar();
+        }
     }
 
     function handleLineNumberClick(e, lineNum) {
@@ -244,6 +272,110 @@
 
     // --- End gap separators ---
 
+    // --- Add comment bar ---
+
+    let addCommentBar = null;
+
+    function showAddCommentBar() {
+        hideAddCommentBar();
+        if (!selectedRange) return;
+
+        addCommentBar = document.createElement("div");
+        addCommentBar.className = "add-comment-bar";
+
+        const label = document.createElement("span");
+        label.className = "add-comment-label";
+        label.textContent = `L${selectedRange.start}-${selectedRange.end}`;
+
+        const btn = document.createElement("button");
+        btn.className = "comment-btn-save";
+        btn.textContent = "Add Comment";
+        btn.onclick = () => showAddCommentForm();
+
+        addCommentBar.appendChild(label);
+        addCommentBar.appendChild(btn);
+        commentContent.parentElement.appendChild(addCommentBar);
+    }
+
+    function hideAddCommentBar() {
+        if (addCommentBar) {
+            addCommentBar.remove();
+            addCommentBar = null;
+        }
+        // Also remove any inline add form
+        const form = document.querySelector(".add-comment-form");
+        if (form) form.remove();
+    }
+
+    function showAddCommentForm() {
+        if (!selectedRange) return;
+        hideAddCommentBar();
+
+        const form = document.createElement("div");
+        form.className = "add-comment-form";
+
+        const heading = document.createElement("div");
+        heading.className = "add-comment-heading";
+        heading.textContent = `New comment on L${selectedRange.start}-${selectedRange.end}`;
+
+        const textarea = document.createElement("textarea");
+        textarea.className = "comment-edit-area";
+        textarea.placeholder = "Write your comment...";
+        textarea.rows = 4;
+
+        const actions = document.createElement("div");
+        actions.className = "comment-form-actions";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "comment-btn-save";
+        saveBtn.textContent = "Save";
+        saveBtn.onclick = async () => {
+            const body = textarea.value.trim();
+            if (!body) return;
+            const author = promptAuthor();
+            saveBtn.disabled = true;
+            try {
+                const resp = await fetch(`/api/comments/create${fileQuery}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        range_start: selectedRange.start,
+                        range_end: selectedRange.end,
+                        body: body,
+                        author: author,
+                    }),
+                });
+                if (!resp.ok) {
+                    const msg = await resp.text();
+                    alert("Error creating comment: " + msg);
+                    return;
+                }
+                await reloadComments();
+                clearLineSelection();
+            } finally {
+                saveBtn.disabled = false;
+            }
+        };
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.className = "comment-btn-cancel";
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.onclick = () => {
+            form.remove();
+            if (selectedRange) showAddCommentBar();
+        };
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(cancelBtn);
+        form.appendChild(heading);
+        form.appendChild(textarea);
+        form.appendChild(actions);
+        commentContent.parentElement.appendChild(form);
+        textarea.focus();
+    }
+
+    // --- End add comment bar ---
+
     function highlightCommentLines(comment) {
         fileContent.querySelectorAll(".line.highlighted").forEach(el => {
             el.classList.remove("highlighted");
@@ -289,13 +421,43 @@
             left.appendChild(rangeSpan);
             header.appendChild(left);
 
+            const rightGroup = document.createElement("span");
+            rightGroup.style.display = "flex";
+            rightGroup.style.alignItems = "center";
+            rightGroup.style.gap = "6px";
+
             if (c.drifted) {
                 const badge = document.createElement("span");
                 badge.className = "drift-badge";
                 badge.textContent = "DRIFTED";
                 badge.title = "Source content has changed since this comment was created";
-                header.appendChild(badge);
+                rightGroup.appendChild(badge);
             }
+
+            if (rwMode) {
+                const editBtn = document.createElement("button");
+                editBtn.className = "comment-action-btn";
+                editBtn.textContent = "[EDIT]";
+                editBtn.title = "Edit comment";
+                editBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    startEditComment(block, c);
+                };
+
+                const deleteBtn = document.createElement("button");
+                deleteBtn.className = "comment-action-btn comment-action-btn-delete";
+                deleteBtn.textContent = "[DEL]";
+                deleteBtn.title = "Delete comment";
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    confirmDeleteComment(c);
+                };
+
+                rightGroup.appendChild(editBtn);
+                rightGroup.appendChild(deleteBtn);
+            }
+
+            header.appendChild(rightGroup);
 
             const body = document.createElement("div");
             body.className = "comment-body";
@@ -311,6 +473,82 @@
             block.addEventListener("mouseleave", () => highlightCommentLines(null));
 
             commentContent.appendChild(block);
+        }
+    }
+
+    function startEditComment(block, comment) {
+        const bodyEl = block.querySelector(".comment-body");
+        if (!bodyEl) return;
+
+        const textarea = document.createElement("textarea");
+        textarea.className = "comment-edit-area";
+        textarea.value = comment.body;
+        textarea.rows = Math.max(3, comment.body.split("\n").length + 1);
+
+        const actions = document.createElement("div");
+        actions.className = "comment-form-actions";
+
+        const saveBtn = document.createElement("button");
+        saveBtn.className = "comment-btn-save";
+        saveBtn.textContent = "Save";
+        saveBtn.onclick = async () => {
+            const newBody = textarea.value.trim();
+            if (!newBody) return;
+            saveBtn.disabled = true;
+            try {
+                const resp = await fetch(`/api/comments/update${fileQuery}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: comment.id, body: newBody }),
+                });
+                if (!resp.ok) {
+                    const msg = await resp.text();
+                    alert("Error updating comment: " + msg);
+                    return;
+                }
+                await reloadComments();
+            } finally {
+                saveBtn.disabled = false;
+            }
+        };
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.className = "comment-btn-cancel";
+        cancelBtn.textContent = "Cancel";
+        cancelBtn.onclick = () => {
+            textarea.replaceWith(bodyEl);
+            actions.remove();
+        };
+
+        actions.appendChild(saveBtn);
+        actions.appendChild(cancelBtn);
+        bodyEl.replaceWith(textarea);
+        block.appendChild(actions);
+        textarea.focus();
+    }
+
+    async function confirmDeleteComment(comment) {
+        if (!confirm(`Delete comment ${comment.id}?`)) return;
+
+        const fileStr = fileParam ? "&file=" + encodeURIComponent(fileParam) : "";
+        const resp = await fetch(`/api/comments/delete?id=${encodeURIComponent(comment.id)}${fileStr}`, {
+            method: "DELETE",
+        });
+        if (!resp.ok) {
+            const msg = await resp.text();
+            alert("Error deleting comment: " + msg);
+            return;
+        }
+        await reloadComments();
+    }
+
+    async function reloadComments() {
+        const data = await fetchComments();
+        comments = data.comments;
+        renderComments();
+        // Re-show add bar if selection exists
+        if (rwMode && selectedRange) {
+            showAddCommentBar();
         }
     }
 
@@ -384,10 +622,13 @@
         commentContent.innerHTML = '<div class="loading">Loading...</div>';
 
         try {
-            const [linesData, commentsData] = await Promise.all([
+            const [linesData, commentsData, config] = await Promise.all([
                 fetchLines(1, CHUNK_SIZE),
                 fetchComments(),
+                fetchConfig(),
             ]);
+
+            rwMode = config.rw === true;
 
             totalLines = linesData.total_lines;
             const displayName = fileParam || commentsData.source_file;
@@ -414,6 +655,14 @@
                 header.insertBefore(backLink, versionEl);
             }
 
+            // RW badge
+            if (rwMode) {
+                const rwBadge = document.createElement("span");
+                rwBadge.className = "rw-badge";
+                rwBadge.textContent = "READ-WRITE";
+                header.insertBefore(rwBadge, versionEl);
+            }
+
             // Set up pane-header download links
             const fileDl = document.getElementById("file-download");
             fileDl.href = `/api/download${fileQuery}`;
@@ -427,9 +676,7 @@
                 commentsDl.style.display = "inline";
             }
 
-            fetch("/api/version").then(r => r.text()).then(v => {
-                versionEl.textContent = v;
-            });
+            versionEl.textContent = config.version || "dev";
 
             await applyHashSelection();
         } catch (err) {

@@ -268,3 +268,125 @@ body {
 .pane-content::-webkit-scrollbar-thumb:hover {
     background: #585b70;
 }
+
+/* RW badge */
+.rw-badge {
+    background: #a6e3a1;
+    color: #1e1e2e;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+/* Add comment bar */
+.add-comment-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #181825;
+    border-top: 1px solid #313244;
+}
+
+.add-comment-label {
+    color: #89b4fa;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Add comment form */
+.add-comment-form {
+    padding: 10px 12px;
+    background: #181825;
+    border-top: 1px solid #313244;
+}
+
+.add-comment-heading {
+    color: #89b4fa;
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+.comment-edit-area {
+    width: 100%;
+    background: #1e1e2e;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    padding: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.comment-edit-area:focus {
+    outline: none;
+    border-color: #89b4fa;
+}
+
+.comment-form-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.comment-btn-save {
+    background: #a6e3a1;
+    color: #1e1e2e;
+    border: none;
+    padding: 4px 14px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.comment-btn-save:hover {
+    background: #94d990;
+}
+
+.comment-btn-save:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.comment-btn-cancel {
+    background: none;
+    color: #6c7086;
+    border: 1px solid #45475a;
+    padding: 4px 14px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.comment-btn-cancel:hover {
+    color: #cdd6f4;
+    border-color: #6c7086;
+}
+
+/* Comment action buttons (edit/delete) */
+.comment-action-btn {
+    background: none;
+    border: none;
+    color: #585b70;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    padding: 0 2px;
+    line-height: 1;
+}
+
+.comment-action-btn:hover {
+    color: #cdd6f4;
+}
+
+.comment-action-btn-delete:hover {
+    color: #f38ba8;
+}

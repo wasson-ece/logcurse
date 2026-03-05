@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/wasson-ece/logcurse/internal/fileutil"
@@ -344,4 +345,344 @@ func TestDirCommentsHandler(t *testing.T) {
 	if resp.Comments[0].Body != "dir comment" {
 		t.Fatalf("expected body=%q, got %q", "dir comment", resp.Comments[0].Body)
 	}
+}
+
+func TestConfigHandler(t *testing.T) {
+	t.Run("rw true", func(t *testing.T) {
+		handler := configHandler(true, "v1.0.0")
+		req := httptest.NewRequest("GET", "/api/config", nil)
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d", w.Code)
+		}
+
+		var resp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&resp)
+		if resp["rw"] != true {
+			t.Fatalf("expected rw=true, got %v", resp["rw"])
+		}
+		if resp["version"] != "v1.0.0" {
+			t.Fatalf("expected version=v1.0.0, got %v", resp["version"])
+		}
+	})
+
+	t.Run("rw false", func(t *testing.T) {
+		handler := configHandler(false, "dev")
+		req := httptest.NewRequest("GET", "/api/config", nil)
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		var resp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&resp)
+		if resp["rw"] != false {
+			t.Fatalf("expected rw=false, got %v", resp["rw"])
+		}
+	})
+}
+
+func TestCreateCommentHandler(t *testing.T) {
+	t.Run("valid create without author", func(t *testing.T) {
+		path := createTestFile(t, 10)
+		handler := createCommentHandler(path)
+
+		body := `{"range_start":1,"range_end":3,"body":"hello world"}`
+		req := httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var resp commentResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		if resp.Body != "hello world" {
+			t.Fatalf("expected body='hello world', got %q", resp.Body)
+		}
+		if !strings.HasPrefix(resp.ID, "w") {
+			t.Fatalf("expected ID starting with 'w', got %q", resp.ID)
+		}
+
+		// Verify sidecar file
+		cf, err := model.Load(model.SidecarPath(path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(cf.Comments) != 1 {
+			t.Fatalf("expected 1 comment in sidecar, got %d", len(cf.Comments))
+		}
+	})
+
+	t.Run("valid create with author", func(t *testing.T) {
+		path := createTestFile(t, 10)
+		handler := createCommentHandler(path)
+
+		body := `{"range_start":1,"range_end":2,"body":"first","author":"chip"}`
+		req := httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var resp commentResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		if resp.ID != "chip1" {
+			t.Fatalf("expected ID='chip1', got %q", resp.ID)
+		}
+
+		// Add a second comment by same author
+		body = `{"range_start":3,"range_end":4,"body":"second","author":"chip"}`
+		req = httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w = httptest.NewRecorder()
+		handler(w, req)
+
+		json.NewDecoder(w.Body).Decode(&resp)
+		if resp.ID != "chip2" {
+			t.Fatalf("expected ID='chip2', got %q", resp.ID)
+		}
+	})
+
+	t.Run("inserts in sorted order by range_start", func(t *testing.T) {
+		path := createTestFile(t, 10)
+		handler := createCommentHandler(path)
+
+		// Create comment on lines 5-6 first
+		body := `{"range_start":5,"range_end":6,"body":"middle","author":"a"}`
+		req := httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d", w.Code)
+		}
+
+		// Create comment on lines 1-2 (should be inserted before)
+		body = `{"range_start":1,"range_end":2,"body":"first","author":"a"}`
+		req = httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w = httptest.NewRecorder()
+		handler(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d", w.Code)
+		}
+
+		// Create comment on lines 8-9 (should be appended)
+		body = `{"range_start":8,"range_end":9,"body":"last","author":"a"}`
+		req = httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w = httptest.NewRecorder()
+		handler(w, req)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("expected 201, got %d", w.Code)
+		}
+
+		cf, err := model.Load(model.SidecarPath(path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(cf.Comments) != 3 {
+			t.Fatalf("expected 3 comments, got %d", len(cf.Comments))
+		}
+		if cf.Comments[0].Range.Start != 1 {
+			t.Fatalf("expected first comment at line 1, got %d", cf.Comments[0].Range.Start)
+		}
+		if cf.Comments[1].Range.Start != 5 {
+			t.Fatalf("expected second comment at line 5, got %d", cf.Comments[1].Range.Start)
+		}
+		if cf.Comments[2].Range.Start != 8 {
+			t.Fatalf("expected third comment at line 8, got %d", cf.Comments[2].Range.Start)
+		}
+	})
+
+	t.Run("invalid range", func(t *testing.T) {
+		path := createTestFile(t, 10)
+		handler := createCommentHandler(path)
+
+		body := `{"range_start":0,"range_end":3,"body":"bad"}`
+		req := httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("range exceeds file", func(t *testing.T) {
+		path := createTestFile(t, 10)
+		handler := createCommentHandler(path)
+
+		body := `{"range_start":1,"range_end":100,"body":"bad"}`
+		req := httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", w.Code)
+		}
+	})
+
+	t.Run("empty body", func(t *testing.T) {
+		path := createTestFile(t, 10)
+		handler := createCommentHandler(path)
+
+		body := `{"range_start":1,"range_end":3,"body":""}`
+		req := httptest.NewRequest("POST", "/api/comments/create", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("expected 400, got %d", w.Code)
+		}
+	})
+}
+
+func TestUpdateCommentHandler(t *testing.T) {
+	t.Run("valid update", func(t *testing.T) {
+		path := createTestFile(t, 10)
+
+		// Create a comment first
+		comment, _ := model.NewComment(path, 1, 3, "original")
+		comment.ID = "c1"
+		cf := &model.CommentFile{Version: 1, SourceFile: path, Comments: []model.Comment{*comment}}
+		model.Save(model.SidecarPath(path), cf)
+
+		handler := updateCommentHandler(path)
+		body := `{"id":"c1","body":"updated body"}`
+		req := httptest.NewRequest("PUT", "/api/comments/update", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var resp commentResponse
+		json.NewDecoder(w.Body).Decode(&resp)
+		if resp.Body != "updated body" {
+			t.Fatalf("expected body='updated body', got %q", resp.Body)
+		}
+
+		// Verify sidecar
+		cf, _ = model.Load(model.SidecarPath(path))
+		if cf.Comments[0].Body != "updated body" {
+			t.Fatalf("sidecar not updated: %q", cf.Comments[0].Body)
+		}
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		path := createTestFile(t, 10)
+		comment, _ := model.NewComment(path, 1, 3, "original")
+		comment.ID = "c1"
+		cf := &model.CommentFile{Version: 1, SourceFile: path, Comments: []model.Comment{*comment}}
+		model.Save(model.SidecarPath(path), cf)
+
+		handler := updateCommentHandler(path)
+		body := `{"id":"nonexistent","body":"updated"}`
+		req := httptest.NewRequest("PUT", "/api/comments/update", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", w.Code)
+		}
+	})
+}
+
+func TestDeleteCommentHandler(t *testing.T) {
+	t.Run("valid delete", func(t *testing.T) {
+		path := createTestFile(t, 10)
+
+		comment, _ := model.NewComment(path, 1, 3, "to delete")
+		comment.ID = "c1"
+		cf := &model.CommentFile{Version: 1, SourceFile: path, Comments: []model.Comment{*comment}}
+		model.Save(model.SidecarPath(path), cf)
+
+		handler := deleteCommentHandler(path)
+		req := httptest.NewRequest("DELETE", "/api/comments/delete?id=c1", nil)
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+		}
+
+		// Verify removed
+		cf, _ = model.Load(model.SidecarPath(path))
+		if len(cf.Comments) != 0 {
+			t.Fatalf("expected 0 comments after delete, got %d", len(cf.Comments))
+		}
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		path := createTestFile(t, 10)
+		comment, _ := model.NewComment(path, 1, 3, "keep")
+		comment.ID = "c1"
+		cf := &model.CommentFile{Version: 1, SourceFile: path, Comments: []model.Comment{*comment}}
+		model.Save(model.SidecarPath(path), cf)
+
+		handler := deleteCommentHandler(path)
+		req := httptest.NewRequest("DELETE", "/api/comments/delete?id=nonexistent", nil)
+		w := httptest.NewRecorder()
+		handler(w, req)
+
+		if w.Code != http.StatusNotFound {
+			t.Fatalf("expected 404, got %d", w.Code)
+		}
+	})
+}
+
+func TestDirCreateCommentHandler(t *testing.T) {
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "test.log")
+	os.WriteFile(logPath, []byte("line1\nline2\nline3\n"), 0644)
+
+	handler := dirCreateCommentHandler(dir)
+	body := `{"range_start":1,"range_end":2,"body":"dir create","author":"web"}`
+	req := httptest.NewRequest("POST", "/api/comments/create?file=test.log", strings.NewReader(body))
+	w := httptest.NewRecorder()
+	handler(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp commentResponse
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Body != "dir create" {
+		t.Fatalf("expected body='dir create', got %q", resp.Body)
+	}
+}
+
+func TestGenerateID(t *testing.T) {
+	t.Run("without author", func(t *testing.T) {
+		cf := &model.CommentFile{}
+		id := generateID(cf, "")
+		if !strings.HasPrefix(id, "w") {
+			t.Fatalf("expected ID starting with 'w', got %q", id)
+		}
+	})
+
+	t.Run("with author first comment", func(t *testing.T) {
+		cf := &model.CommentFile{}
+		id := generateID(cf, "alice")
+		if id != "alice1" {
+			t.Fatalf("expected 'alice1', got %q", id)
+		}
+	})
+
+	t.Run("with author increments", func(t *testing.T) {
+		cf := &model.CommentFile{
+			Comments: []model.Comment{
+				{ID: "alice1"},
+				{ID: "alice2"},
+				{ID: "bob1"},
+			},
+		}
+		id := generateID(cf, "alice")
+		if id != "alice3" {
+			t.Fatalf("expected 'alice3', got %q", id)
+		}
+	})
 }

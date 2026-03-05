@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/wasson-ece/logcurse/internal/fileutil"
 	"github.com/wasson-ece/logcurse/internal/model"
@@ -279,5 +281,279 @@ func dirDownloadCommentsHandler(dir string) http.HandlerFunc {
 		ymlName := filepath.Base(ymlPath)
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, ymlName))
 		http.ServeFile(w, r, ymlPath)
+	}
+}
+
+// configHandler returns the server configuration as JSON.
+func configHandler(rw bool, version string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"rw":      rw,
+			"version": version,
+		})
+	}
+}
+
+type createCommentRequest struct {
+	RangeStart int    `json:"range_start"`
+	RangeEnd   int    `json:"range_end"`
+	Body       string `json:"body"`
+	Author     string `json:"author"`
+}
+
+// generateID creates a comment ID. If author is empty, returns w<unix_timestamp>.
+// If author is set, scans existing comments for <authorLower><N> and returns max+1.
+func generateID(cf *model.CommentFile, author string) string {
+	if author == "" {
+		return fmt.Sprintf("w%d", time.Now().Unix())
+	}
+	prefix := strings.ToLower(author)
+	re := regexp.MustCompile(`^` + regexp.QuoteMeta(prefix) + `(\d+)$`)
+	max := 0
+	for _, c := range cf.Comments {
+		if m := re.FindStringSubmatch(c.ID); m != nil {
+			n, _ := strconv.Atoi(m[1])
+			if n > max {
+				max = n
+			}
+		}
+	}
+	return fmt.Sprintf("%s%d", prefix, max+1)
+}
+
+func createCommentHandler(sourceFile string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req createCommentRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if req.Body == "" {
+			http.Error(w, "body is required", http.StatusBadRequest)
+			return
+		}
+
+		totalLines, err := fileutil.CountLines(sourceFile)
+		if err != nil {
+			http.Error(w, "counting lines: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if req.RangeStart < 1 || req.RangeEnd < req.RangeStart || req.RangeEnd > totalLines {
+			http.Error(w, fmt.Sprintf("invalid range: must be 1-%d", totalLines), http.StatusBadRequest)
+			return
+		}
+
+		ymlPath := model.SidecarPath(sourceFile)
+		var cf *model.CommentFile
+		if _, err := os.Stat(ymlPath); err == nil {
+			cf, err = model.Load(ymlPath)
+			if err != nil {
+				http.Error(w, "loading comments: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			cf = &model.CommentFile{
+				Version:    1,
+				SourceFile: sourceFile,
+				Comments:   []model.Comment{},
+			}
+		}
+
+		comment, err := model.NewComment(sourceFile, req.RangeStart, req.RangeEnd, req.Body)
+		if err != nil {
+			http.Error(w, "creating comment: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		comment.ID = generateID(cf, req.Author)
+		comment.Author = req.Author
+
+		// Insert in sorted order by range start
+		insertIdx := len(cf.Comments)
+		for i, c := range cf.Comments {
+			if req.RangeStart < c.Range.Start {
+				insertIdx = i
+				break
+			}
+		}
+		cf.Comments = append(cf.Comments, model.Comment{})
+		copy(cf.Comments[insertIdx+1:], cf.Comments[insertIdx:])
+		cf.Comments[insertIdx] = *comment
+
+		if err := model.Save(ymlPath, cf); err != nil {
+			http.Error(w, "saving: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(commentResponse{
+			ID:          comment.ID,
+			RangeStart:  comment.Range.Start,
+			RangeEnd:    comment.Range.End,
+			Body:        comment.Body,
+			Author:      comment.Author,
+			Created:     comment.Created,
+			Updated:     comment.Updated,
+			ContentHash: comment.ContentHash,
+		})
+	}
+}
+
+type updateCommentRequest struct {
+	ID   string `json:"id"`
+	Body string `json:"body"`
+}
+
+func updateCommentHandler(sourceFile string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req updateCommentRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if req.ID == "" || req.Body == "" {
+			http.Error(w, "id and body are required", http.StatusBadRequest)
+			return
+		}
+
+		ymlPath := model.SidecarPath(sourceFile)
+		cf, err := model.Load(ymlPath)
+		if err != nil {
+			http.Error(w, "loading comments: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		idx := -1
+		for i, c := range cf.Comments {
+			if c.ID == req.ID {
+				idx = i
+				break
+			}
+		}
+		if idx == -1 {
+			http.Error(w, "comment not found", http.StatusNotFound)
+			return
+		}
+
+		cf.Comments[idx].Body = req.Body
+		cf.Comments[idx].Updated = time.Now().UTC().Format(time.RFC3339)
+
+		hash, err := fileutil.ContentHash(sourceFile, cf.Comments[idx].Range.Start, cf.Comments[idx].Range.End)
+		if err == nil {
+			cf.Comments[idx].ContentHash = hash
+		}
+
+		if err := model.Save(ymlPath, cf); err != nil {
+			http.Error(w, "saving: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		c := cf.Comments[idx]
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(commentResponse{
+			ID:          c.ID,
+			RangeStart:  c.Range.Start,
+			RangeEnd:    c.Range.End,
+			Body:        c.Body,
+			Author:      c.Author,
+			Created:     c.Created,
+			Updated:     c.Updated,
+			ContentHash: c.ContentHash,
+		})
+	}
+}
+
+func deleteCommentHandler(sourceFile string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "id is required", http.StatusBadRequest)
+			return
+		}
+
+		ymlPath := model.SidecarPath(sourceFile)
+		cf, err := model.Load(ymlPath)
+		if err != nil {
+			http.Error(w, "loading comments: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		idx := -1
+		for i, c := range cf.Comments {
+			if c.ID == id {
+				idx = i
+				break
+			}
+		}
+		if idx == -1 {
+			http.Error(w, "comment not found", http.StatusNotFound)
+			return
+		}
+
+		cf.Comments = append(cf.Comments[:idx], cf.Comments[idx+1:]...)
+		if err := model.Save(ymlPath, cf); err != nil {
+			http.Error(w, "saving: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+	}
+}
+
+// Directory-mode wrappers for write handlers
+
+func dirCreateCommentHandler(dir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		filename := r.URL.Query().Get("file")
+		fullPath, err := resolveAndValidate(dir, filename)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		createCommentHandler(fullPath)(w, r)
+	}
+}
+
+func dirUpdateCommentHandler(dir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		filename := r.URL.Query().Get("file")
+		fullPath, err := resolveAndValidate(dir, filename)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		updateCommentHandler(fullPath)(w, r)
+	}
+}
+
+func dirDeleteCommentHandler(dir string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		filename := r.URL.Query().Get("file")
+		fullPath, err := resolveAndValidate(dir, filename)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		deleteCommentHandler(fullPath)(w, r)
 	}
 }

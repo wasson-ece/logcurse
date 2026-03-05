@@ -46,11 +46,23 @@ logcurse --serve ./logs/
 
 # use a custom port
 logcurse --serve --port 9090 server.log
+
+# enable read-write mode (add/edit/delete comments in the browser)
+logcurse --serve --rw server.log
 ```
 
 Serves a web viewer at `http://localhost:8080` (default). Lines load on demand in chunks, so this works with large files. Click a line number to select it (shift+click for a range) — the URL updates to `#L10` or `#L10-L25` so you can share links that highlight and scroll to specific lines.
 
 When given a directory, logcurse shows a file listing page with annotation status. Annotated files (those with `.yml` sidecars) are sorted to the top with comment counts. Click any file to open it in the viewer.
+
+#### Read-write mode
+
+The `--rw` flag enables creating, editing, and deleting comments directly in the browser. Without it, the web viewer is read-only and no write endpoints are registered.
+
+In read-write mode:
+- Select lines and click "Add Comment" to create a new comment
+- Use the [EDIT] and [DEL] buttons on each comment to modify or remove it
+- On your first comment, you'll be prompted for a name which is stored in your browser and used for comment IDs (e.g. `chip1`, `chip2`)
 
 ## Install
 

@@ -89,10 +89,31 @@ Keybindings:
     logcurse --serve <file>
     logcurse --serve <directory>
     logcurse --serve --port <port> <file>
+    logcurse --serve --rw <file>
+    logcurse --serve --rw <directory>
 
 Serves an interactive web UI at http://localhost:8080 (default). The --port flag sets a custom port. The frontend loads lines in 200-line chunks on demand with 2-chunk buffering, so it handles large files. Click a line number to select it, or shift+click to select a range. The URL hash updates to #L10 or #L10-L25 for shareable links that highlight and scroll to the selected lines on load.
 
 When given a directory, logcurse shows a file listing page with annotation status. Annotated files (those with .yml sidecars) are sorted to the top with comment counts displayed. Click any file to open it in the viewer. The directory listing is non-recursive (only top-level files are shown).
+
+### Read-write mode
+
+The --rw flag enables creating, editing, and deleting comments through the web interface. Without it, the web viewer is read-only and no write API endpoints are registered.
+
+In read-write mode:
+- A "READ-WRITE" badge appears in the header
+- Select lines and click "Add Comment" to create a new comment with an inline form
+- Each comment shows [EDIT] and [DEL] buttons for modification and removal
+- On first comment creation, the browser prompts for an author name, stored in localStorage
+- Comment IDs are author-based when a name is set (e.g. chip1, chip2) or timestamp-based when anonymous (e.g. w1741193400)
+- New comments are inserted in sorted order by starting line number in the YAML sidecar
+
+Write API endpoints (only available when --rw is enabled):
+- POST /api/comments/create — create a comment (JSON body: range_start, range_end, body, author)
+- PUT /api/comments/update — update a comment body (JSON body: id, body)
+- DELETE /api/comments/delete?id=<id> — delete a comment by ID
+
+The /api/config endpoint always returns {"rw": true/false, "version": "..."} so the frontend knows whether to show write controls.
 
 ### Flags summary
 
@@ -102,6 +123,7 @@ When given a directory, logcurse shows a file listing page with annotation statu
     logcurse --serve <file>                  # web viewer on :8080
     logcurse --serve <directory>             # directory browser on :8080
     logcurse --serve --port <port> <file>    # web viewer on custom port
+    logcurse --serve --rw <file>             # web viewer with read-write comments
     logcurse --version                       # print version
 
 ## Comment format
@@ -124,10 +146,10 @@ Comments are stored in a YAML sidecar file at <file>.yml (e.g. server.log -> ser
           Root cause was the DB migration running long.
 
 Fields:
-- id: sequential string (c1, c2, c3, ...)
+- id: sequential string from CLI (c1, c2, c3, ...), author-based from web (chip1, chip2), or timestamp-based (w1741193400)
 - range.start / range.end: 1-indexed, inclusive line numbers
 - content_hash: SHA-256 of the referenced lines at comment creation time
-- author: string (currently empty, reserved for future use)
+- author: string (set via web viewer read-write mode, empty from CLI)
 - created / updated: RFC 3339 timestamps
 - body: free-text comment content
 

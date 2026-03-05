@@ -245,10 +245,14 @@ logcurse --serve server.log
 logcurse --serve ./logs/
 
 <span class="c-comment"># use a custom port</span>
-logcurse --serve --port 9090 server.log</code></pre>
+logcurse --serve --port 9090 server.log
+
+<span class="c-comment"># enable read-write mode</span>
+logcurse --serve --rw server.log</code></pre>
         </div>
         <p>The web viewer fetches 200-line chunks on demand with 2-chunk buffering, so it handles large files efficiently. Click a line number to select it, or shift+click to select a range &mdash; the URL updates to <code>#L10</code> or <code>#L10-L25</code> for shareable links that highlight and scroll to the selected lines.</p>
         <p>In directory mode, logcurse shows a file listing with annotation status. Annotated files are sorted to the top with comment counts. Click any file to open it in the viewer.</p>
+        <p>The <code>--rw</code> flag enables creating, editing, and deleting comments directly in the browser. Select lines and click &ldquo;Add Comment&rdquo; to write a new comment, or use the [EDIT] and [DEL] controls on existing comments. Your author name is prompted on first use and stored in the browser for future comment IDs.</p>
       </div>
 
     </div>
@@ -278,7 +282,7 @@ logcurse --serve --port 9090 server.log</code></pre>
       </div>
       <div class="format-notes">
         <div class="format-note">
-          <strong>IDs</strong> are sequential: <code>c1</code>, <code>c2</code>, <code>c3</code>&hellip;
+          <strong>IDs</strong> are sequential from the CLI (<code>c1</code>, <code>c2</code>), author-based from the web (<code>chip1</code>, <code>chip2</code>), or timestamp-based when anonymous (<code>w1741193400</code>).
         </div>
         <div class="format-note">
           <strong>Ranges</strong> are 1-indexed and inclusive.

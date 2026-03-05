@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-05
+
+### Added
+
+- Read-write mode for the web viewer: `logcurse --serve --rw <file|dir>` enables creating, editing, and deleting comments directly in the browser
+- "Add Comment" button appears when lines are selected in read-write mode, with an inline form for writing comment body
+- Inline edit and delete controls on each comment block (visible only in read-write mode)
+- Author name prompt on first comment creation, stored in browser `localStorage` and used for comment IDs
+- Author-based comment IDs (`chip1`, `chip2`, ...) when an author is set; timestamp-based IDs (`w1741193400`) when anonymous
+- "READ-WRITE" badge in web viewer header when `--rw` is active
+- `/api/config` endpoint returning server configuration (rw mode, version)
+- `/api/comments/create`, `/api/comments/update`, `/api/comments/delete` endpoints (only registered when `--rw` is enabled; return 404 otherwise)
+- New comments are inserted in sorted order by starting line number in the YAML sidecar file
+
 ## [0.4.0] - 2026-03-05
 
 ### Added

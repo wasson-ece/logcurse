@@ -15,7 +15,7 @@ import (
 var staticFS embed.FS
 
 // Serve starts the web viewer on the given port.
-func Serve(sourceFile string, port int, version string) error {
+func Serve(sourceFile string, port int, version string, rw bool) error {
 	idx, err := fileutil.BuildLineIndex(sourceFile, fileutil.DefaultIndexInterval)
 	if err != nil {
 		return fmt.Errorf("building line index: %w", err)
@@ -28,10 +28,17 @@ func Serve(sourceFile string, port int, version string) error {
 	mux.HandleFunc("/api/comments", commentsHandler(sourceFile))
 	mux.HandleFunc("/api/download", downloadHandler(sourceFile))
 	mux.HandleFunc("/api/download-comments", downloadCommentsHandler(sourceFile))
+	mux.HandleFunc("/api/config", configHandler(rw, version))
 	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(version))
 	})
+
+	if rw {
+		mux.HandleFunc("/api/comments/create", createCommentHandler(sourceFile))
+		mux.HandleFunc("/api/comments/update", updateCommentHandler(sourceFile))
+		mux.HandleFunc("/api/comments/delete", deleteCommentHandler(sourceFile))
+	}
 
 	// Static files
 	staticSub, err := fs.Sub(staticFS, "static")
@@ -41,7 +48,11 @@ func Serve(sourceFile string, port int, version string) error {
 	mux.Handle("/", http.FileServer(http.FS(staticSub)))
 
 	addr := fmt.Sprintf(":%d", port)
-	fmt.Printf("logcurse web viewer: http://localhost%s\n", addr)
+	mode := "read-only"
+	if rw {
+		mode = "read-write"
+	}
+	fmt.Printf("logcurse web viewer (%s): http://localhost%s\n", mode, addr)
 	fmt.Printf("Serving %s (%d lines)\n", sourceFile, idx.TotalLines)
 	return http.ListenAndServe(addr, mux)
 }
@@ -73,7 +84,7 @@ func (c *indexCache) Get(path string) (*fileutil.LineIndex, error) {
 }
 
 // ServeDirectory starts the web viewer in directory mode.
-func ServeDirectory(dir string, port int, version string) error {
+func ServeDirectory(dir string, port int, version string, rw bool) error {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return fmt.Errorf("resolving directory: %w", err)
@@ -88,10 +99,17 @@ func ServeDirectory(dir string, port int, version string) error {
 	mux.HandleFunc("/api/comments", dirCommentsHandler(absDir))
 	mux.HandleFunc("/api/download", dirDownloadHandler(absDir))
 	mux.HandleFunc("/api/download-comments", dirDownloadCommentsHandler(absDir))
+	mux.HandleFunc("/api/config", configHandler(rw, version))
 	mux.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(version))
 	})
+
+	if rw {
+		mux.HandleFunc("/api/comments/create", dirCreateCommentHandler(absDir))
+		mux.HandleFunc("/api/comments/update", dirUpdateCommentHandler(absDir))
+		mux.HandleFunc("/api/comments/delete", dirDeleteCommentHandler(absDir))
+	}
 
 	// Static viewer files under /view/
 	staticSub, err := fs.Sub(staticFS, "static")
@@ -116,7 +134,11 @@ func ServeDirectory(dir string, port int, version string) error {
 	})
 
 	addr := fmt.Sprintf(":%d", port)
-	fmt.Printf("logcurse web viewer: http://localhost%s\n", addr)
+	mode := "read-only"
+	if rw {
+		mode = "read-write"
+	}
+	fmt.Printf("logcurse web viewer (%s): http://localhost%s\n", mode, addr)
 	fmt.Printf("Serving directory %s\n", absDir)
 	return http.ListenAndServe(addr, mux)
 }
