@@ -127,6 +127,18 @@ logcurse checks these in order:
 2. `$EDITOR`
 3. `nano` (macOS/Linux) or `notepad` (Windows)
 
+## Agent Usage
+
+logcurse publishes machine-readable documentation for LLMs and AI coding agents at [logcurse.wasson-ece.dev/llms.txt](https://logcurse.wasson-ece.dev/llms.txt).
+
+When instructing an LLM to use logcurse, include something like this in your prompt:
+
+```
+logcurse is a CLI tool for annotating log files with line-range comments
+stored in YAML sidecar files. For full usage and API documentation, read
+https://logcurse.wasson-ece.dev/llms.txt
+```
+
 ## License
 
 MIT

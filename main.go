@@ -29,6 +29,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  logcurse --serve --rw <file|dir>  Serve with read-write comments\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nAgent Usage:\n")
+		fmt.Fprintf(os.Stderr, "  LLMs and AI coding agents can find machine-readable documentation at:\n")
+		fmt.Fprintf(os.Stderr, "  https://logcurse.wasson-ece.dev/llms.txt\n")
 	}
 	flag.Parse()
 
