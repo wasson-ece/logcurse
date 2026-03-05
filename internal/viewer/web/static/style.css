@@ -112,6 +112,17 @@ body {
     padding-right: 12px;
     user-select: none;
     flex-shrink: 0;
+    cursor: pointer;
+}
+
+.line.selected {
+    background: #45475a;
+    border-left: 3px solid #89b4fa;
+    padding-left: 9px;
+}
+
+.line.selected .line-number {
+    color: #89b4fa;
 }
 
 .line-text {
@@ -216,6 +227,21 @@ body {
 .gap-btn:hover {
     background: #313244;
     border-color: #89b4fa;
+}
+
+@keyframes rainbow {
+    0%   { border-color: #f38ba8; color: #f38ba8; }
+    16%  { border-color: #fab387; color: #fab387; }
+    33%  { border-color: #f9e2af; color: #f9e2af; }
+    50%  { border-color: #a6e3a1; color: #a6e3a1; }
+    66%  { border-color: #89b4fa; color: #89b4fa; }
+    83%  { border-color: #cba6f7; color: #cba6f7; }
+    100% { border-color: #f38ba8; color: #f38ba8; }
+}
+
+.gap-btn-rainbow {
+    animation: rainbow 1.5s linear infinite;
+    background: #313244;
 }
 
 .loading {

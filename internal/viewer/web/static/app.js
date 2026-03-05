@@ -14,6 +14,7 @@
     let loadedRanges = []; // [{start, end}]
     let comments = [];
     let loading = false;
+    let selectedRange = null; // {start, end}
 
     const fileContent = document.getElementById("file-content");
     const commentContent = document.getElementById("comment-content");
@@ -48,6 +49,38 @@
         loadedRanges = merged;
     }
 
+    function clearLineSelection() {
+        fileContent.querySelectorAll(".line.selected").forEach(el => {
+            el.classList.remove("selected");
+        });
+        selectedRange = null;
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+
+    function updateLineSelection(start, end) {
+        fileContent.querySelectorAll(".line.selected").forEach(el => {
+            el.classList.remove("selected");
+        });
+        selectedRange = { start: Math.min(start, end), end: Math.max(start, end) };
+        for (let i = selectedRange.start; i <= selectedRange.end; i++) {
+            const el = fileContent.querySelector(`.line[data-line="${i}"]`);
+            if (el) el.classList.add("selected");
+        }
+        const hash = selectedRange.start === selectedRange.end
+            ? `#L${selectedRange.start}`
+            : `#L${selectedRange.start}-L${selectedRange.end}`;
+        history.replaceState(null, "", hash);
+    }
+
+    function handleLineNumberClick(e, lineNum) {
+        e.preventDefault();
+        if (e.shiftKey && selectedRange) {
+            updateLineSelection(selectedRange.start, lineNum);
+        } else {
+            updateLineSelection(lineNum, lineNum);
+        }
+    }
+
     function createLineElement(num, text) {
         const div = document.createElement("div");
         div.className = "line";
@@ -56,6 +89,7 @@
         const numSpan = document.createElement("span");
         numSpan.className = "line-number";
         numSpan.textContent = num;
+        numSpan.addEventListener("click", (e) => handleLineNumberClick(e, num));
 
         const textSpan = document.createElement("span");
         textSpan.className = "line-text";
@@ -63,6 +97,12 @@
 
         div.appendChild(numSpan);
         div.appendChild(textSpan);
+
+        // Apply selected class if this line is in the current selection
+        if (selectedRange && num >= selectedRange.start && num <= selectedRange.end) {
+            div.classList.add("selected");
+        }
+
         return div;
     }
 
@@ -110,12 +150,44 @@
         const downBtn = document.createElement("button");
         downBtn.className = "gap-btn";
         downBtn.textContent = "\u2193 load down\u2026";
-        downBtn.onclick = () => loadGapChunk(gapStart, Math.min(gapEnd, gapStart + GAP_CHUNK - 1));
+        downBtn.onclick = (e) => {
+            if (e.shiftKey) {
+                loadGapChunk(gapStart, gapEnd);
+            } else {
+                loadGapChunk(gapStart, Math.min(gapEnd, gapStart + GAP_CHUNK - 1));
+            }
+        };
+        downBtn.addEventListener("mouseenter", function(e) {
+            if (e.shiftKey) { downBtn.classList.add("gap-btn-rainbow"); downBtn.textContent = "\u2193 load all down"; }
+        });
+        downBtn.addEventListener("mouseleave", function() {
+            downBtn.classList.remove("gap-btn-rainbow"); downBtn.textContent = "\u2193 load down\u2026";
+        });
+        downBtn.addEventListener("mousemove", function(e) {
+            if (e.shiftKey) { downBtn.classList.add("gap-btn-rainbow"); downBtn.textContent = "\u2193 load all down"; }
+            else { downBtn.classList.remove("gap-btn-rainbow"); downBtn.textContent = "\u2193 load down\u2026"; }
+        });
 
         const upBtn = document.createElement("button");
         upBtn.className = "gap-btn";
         upBtn.textContent = "\u2191 load up\u2026";
-        upBtn.onclick = () => loadGapChunk(Math.max(gapStart, gapEnd - GAP_CHUNK + 1), gapEnd);
+        upBtn.onclick = (e) => {
+            if (e.shiftKey) {
+                loadGapChunk(gapStart, gapEnd);
+            } else {
+                loadGapChunk(Math.max(gapStart, gapEnd - GAP_CHUNK + 1), gapEnd);
+            }
+        };
+        upBtn.addEventListener("mouseenter", function(e) {
+            if (e.shiftKey) { upBtn.classList.add("gap-btn-rainbow"); upBtn.textContent = "\u2191 load all up"; }
+        });
+        upBtn.addEventListener("mouseleave", function() {
+            upBtn.classList.remove("gap-btn-rainbow"); upBtn.textContent = "\u2191 load up\u2026";
+        });
+        upBtn.addEventListener("mousemove", function(e) {
+            if (e.shiftKey) { upBtn.classList.add("gap-btn-rainbow"); upBtn.textContent = "\u2191 load all up"; }
+            else { upBtn.classList.remove("gap-btn-rainbow"); upBtn.textContent = "\u2191 load up\u2026"; }
+        });
 
         actions.appendChild(downBtn);
         actions.appendChild(upBtn);
@@ -208,7 +280,10 @@
             const rangeSpan = document.createElement("span");
             rangeSpan.className = "comment-range";
             rangeSpan.textContent = ` L${c.range_start}-${c.range_end}`;
-            rangeSpan.onclick = () => scrollToLine(c.range_start);
+            rangeSpan.onclick = () => {
+                clearLineSelection();
+                scrollToLine(c.range_start);
+            };
 
             left.appendChild(idSpan);
             left.appendChild(rangeSpan);
@@ -229,9 +304,9 @@
             block.appendChild(header);
             block.appendChild(body);
 
-            block.addEventListener("mouseenter", () => {
+            block.addEventListener("mouseenter", async () => {
+                await ensureLinesLoaded(c.range_start, c.range_end);
                 highlightCommentLines(c);
-                ensureLinesLoaded(c.range_start, c.range_end);
             });
             block.addEventListener("mouseleave", () => highlightCommentLines(null));
 
@@ -355,10 +430,27 @@
             fetch("/api/version").then(r => r.text()).then(v => {
                 versionEl.textContent = v;
             });
+
+            await applyHashSelection();
         } catch (err) {
             fileContent.innerHTML = `<div class="loading">Error: ${err.message}</div>`;
         }
     }
+
+    async function applyHashSelection() {
+        const match = location.hash.match(/^#L(\d+)(?:-L(\d+))?$/);
+        if (!match) return;
+        const start = parseInt(match[1]);
+        const end = match[2] ? parseInt(match[2]) : start;
+        const lo = Math.min(start, end);
+        const hi = Math.max(start, end);
+        await ensureLinesLoaded(lo, hi);
+        updateLineSelection(lo, hi);
+        const el = fileContent.querySelector(`.line[data-line="${lo}"]`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    window.addEventListener("hashchange", () => applyHashSelection());
 
     init();
 })();

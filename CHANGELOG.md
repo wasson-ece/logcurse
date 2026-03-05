@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/), and this
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-05
+
+### Added
+
+- GitHub-style line number selection in the web viewer: click a line number to select it, shift+click to select a range
+- URL hash updates (`#L10` or `#L10-L25`) for shareable links that highlight and scroll to selected lines
+- Opening a URL with a line hash loads the lines, highlights them, and scrolls into view
+
+### Fixed
+
+- Comment hover highlighting now works correctly for lines that haven't been loaded yet (lines load before highlight is applied)
+
 ## [0.3.0] - 2026-03-04
 
 ### Added

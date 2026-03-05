@@ -48,7 +48,7 @@ logcurse --serve ./logs/
 logcurse --serve --port 9090 server.log
 ```
 
-Serves a web viewer at `http://localhost:8080` (default). Lines load on demand in chunks, so this works with large files.
+Serves a web viewer at `http://localhost:8080` (default). Lines load on demand in chunks, so this works with large files. Click a line number to select it (shift+click for a range) — the URL updates to `#L10` or `#L10-L25` so you can share links that highlight and scroll to specific lines.
 
 When given a directory, logcurse shows a file listing page with annotation status. Annotated files (those with `.yml` sidecars) are sorted to the top with comment counts. Click any file to open it in the viewer.
 

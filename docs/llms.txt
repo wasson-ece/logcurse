@@ -90,7 +90,7 @@ Keybindings:
     logcurse --serve <directory>
     logcurse --serve --port <port> <file>
 
-Serves an interactive web UI at http://localhost:8080 (default). The --port flag sets a custom port. The frontend loads lines in 200-line chunks on demand with 2-chunk buffering, so it handles large files.
+Serves an interactive web UI at http://localhost:8080 (default). The --port flag sets a custom port. The frontend loads lines in 200-line chunks on demand with 2-chunk buffering, so it handles large files. Click a line number to select it, or shift+click to select a range. The URL hash updates to #L10 or #L10-L25 for shareable links that highlight and scroll to the selected lines on load.
 
 When given a directory, logcurse shows a file listing page with annotation status. Annotated files (those with .yml sidecars) are sorted to the top with comment counts displayed. Click any file to open it in the viewer. The directory listing is non-recursive (only top-level files are shown).
 

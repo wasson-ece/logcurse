@@ -247,7 +247,7 @@ logcurse --serve ./logs/
 <span class="c-comment"># use a custom port</span>
 logcurse --serve --port 9090 server.log</code></pre>
         </div>
-        <p>The web viewer fetches 200-line chunks on demand with 2-chunk buffering, so it handles large files efficiently.</p>
+        <p>The web viewer fetches 200-line chunks on demand with 2-chunk buffering, so it handles large files efficiently. Click a line number to select it, or shift+click to select a range &mdash; the URL updates to <code>#L10</code> or <code>#L10-L25</code> for shareable links that highlight and scroll to the selected lines.</p>
         <p>In directory mode, logcurse shows a file listing with annotation status. Annotated files are sorted to the top with comment counts. Click any file to open it in the viewer.</p>
       </div>
 
